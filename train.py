@@ -514,11 +514,11 @@ def train(hyp, opt, device, tb_writer=None):
                     Thread(
                         target=plot_images, args=(imgs, targets, paths, f), daemon=True
                     ).start()
-                    if tb_writer:
-                        tb_writer.add_graph(
-                            torch.jit.trace(model, imgs, strict=False), []
-                        )  # add model graph
-                        # tb_writer.add_image(f, result, dataformats='HWC', global_step=epoch)
+                    #if tb_writer:
+                    #    tb_writer.add_graph(
+                    #        torch.jit.trace(model, imgs, strict=False), []
+                    #    )  # add model graph
+                    #    # tb_writer.add_image(f, result, dataformats='HWC', global_step=epoch)
                 elif plots and ni == 10 and wandb_logger.wandb:
                     wandb_logger.log(
                         {
@@ -764,7 +764,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--workers", type=int, default=8, help="maximum number of dataloader workers"
     )
-    # parser.add_argument("--project", default="runs/train", help="save to project/name")
+    parser.add_argument("--project", default="runs/train", help="save to project/name")
     parser.add_argument("--entity", default=None, help="W&B entity")
     parser.add_argument("--name", default="exp", help="save to project/name")
     parser.add_argument(
@@ -870,8 +870,8 @@ if __name__ == "__main__":
         opt.model_dir = opt.model_dir[1:]
         opt.save_dir = str(
             increment_path(
-                # Path(opt.project) / opt.name
-                Path(opt.model_dir) / opt.name,
+                Path(opt.project) / opt.name, 
+                # Path(opt.model_dir) / opt.name,
                 exist_ok=opt.exist_ok | opt.evolve,
             )
         )
