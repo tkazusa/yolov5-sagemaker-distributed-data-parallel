@@ -9,6 +9,7 @@ import time
 from copy import deepcopy
 from pathlib import Path
 from threading import Thread
+import shutil
 
 import numpy as np
 
@@ -158,9 +159,15 @@ def train(hyp, opt, device, tb_writer=None):
         )  # create
     with torch_distributed_zero_first(rank):
         check_dataset(data_dict)  # check
-    train_path = data_dict["train"]
-    test_path = data_dict["val"]
+    
+    # -------------- SageMaker の train と val  ------------- #
+    #train_path = data_dict["train"]
+    #test_path = data_dict["val"]
 
+    data_path = opt.data_dir 
+    train_path = data_path + "/train2017.txt"
+    test_path = data_path + "/val2017.txt"
+    
     # Freeze
     freeze = []  # parameter names to freeze (full or partial)
     for k, v in model.named_parameters():
@@ -379,6 +386,7 @@ def train(hyp, opt, device, tb_writer=None):
     for epoch in range(
         start_epoch, epochs
     ):  # epoch ------------------------------------------------------------------
+        print(epoch)
         model.train()
 
         # Update image weights (optional)
@@ -429,6 +437,7 @@ def train(hyp, opt, device, tb_writer=None):
             pbar
         ):  # batch -------------------------------------------------------------
             ni = i + nb * epoch  # number integrated batches (since train start)
+            print(f'batch: {ni}')
             imgs = (
                 imgs.to(device, non_blocking=True).float() / 255.0
             )  # uint8 to float32, 0-255 to 0.0-1.0
@@ -697,13 +706,16 @@ if __name__ == "__main__":
         "--weights", type=str, default="yolov5s.pt", help="initial weights path"
     )
     parser.add_argument("--cfg", type=str, default="", help="model.yaml path")
+    
+    
     parser.add_argument(
-        "--data", type=str, default="data/coco128.yaml", help="data.yaml path"
+        # "--data", type=str, default="data/coco128.yaml", help="data.yaml path"
+        "--data", type=str, default="data/coco.yaml", help="data.yaml path"
     )
     parser.add_argument(
         "--hyp", type=str, default="data/hyp.scratch.yaml", help="hyperparameters path"
     )
-    parser.add_argument("--epochs", type=int, default=300)
+    parser.add_argument("--epochs", type=int, default=3)
     parser.add_argument(
         "--batch-size", type=int, default=16, help="total batch size for all GPUs"
     )
@@ -808,12 +820,15 @@ if __name__ == "__main__":
     parser.add_argument(
         "--current_host", type=str, default=os.environ["SM_CURRENT_HOST"]
     )
-    parser.add_argument("--model_dir", type=str, default=os.environ["SM_MODEL_DIR"])
-
     parser.add_argument(
-        "--data_dir", type=str, default=os.environ["SM_CHANNEL_TRAINING"]
+        "--model_dir", type=str, default=os.environ["SM_MODEL_DIR"]
     )
-    parser.add_argument("--num_gpus", type=int, default=os.environ["SM_NUM_GPUS"])
+    parser.add_argument(
+        "--data_dir", type=str, default=os.environ["SM_CHANNEL_DATA"]
+    )      
+    parser.add_argument(
+        "--num_gpus", type=int, default=os.environ["SM_NUM_GPUS"]
+    )
 
     opt = parser.parse_args()
 
@@ -867,10 +882,11 @@ if __name__ == "__main__":
 
         # --------- Save dir の定義 -----------#
         # increment_path method require path(str) without initial "/"
-        opt.model_dir = opt.model_dir[1:]
+        # opt.model_dir = opt.model_dir[1:]
         opt.save_dir = str(
             increment_path(
-                Path(opt.project) / opt.name, 
+                # Path(opt.project) / opt.name,
+                Path(opt.model_dir) / Path(opt.project) / opt.name, 
                 # Path(opt.model_dir) / opt.name,
                 exist_ok=opt.exist_ok | opt.evolve,
             )
@@ -1007,3 +1023,6 @@ if __name__ == "__main__":
             f"Hyperparameter evolution complete. Best results saved as: {yaml_file}\n"
             f"Command to train a new model with these hyperparameters: $ python train.py --hyp {yaml_file}"
         )
+        
+        # SM_MODEL_DIR 
+        shutil.move(opt.save_dir, opt.model_dir)
